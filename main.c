@@ -1,36 +1,55 @@
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#define SIZE_BUFFER 64
 
-FILE* mon_fichier;
+#include "t_element.h"
+
+FILE *mon_fichier;
 char mon_caractere;
+char buffer[SIZE_BUFFER];
+a_element mon_element;
 
-void passer_espace(){
-    while(mon_caractere == ' ' || mon_caractere == '\t' || mon_caractere == '\n' || mon_caractere == '\r'){
+void init_buffer()
+{
+    for (int i = 0; i < 64; i++)
+    {
+        buffer[i] = '\0';
+    }
+}
+
+void passer_espace()
+{
+    while (mon_caractere == ' ' || mon_caractere == '\t' || mon_caractere == '\n' || mon_caractere == '\r')
+    {
         mon_caractere = fgetc(mon_fichier);
     }
 }
 
-void amorcer(){
-    mon_fichier = fopen("exemples.txt", "r");
-    if(mon_fichier == NULL){
+void amorcer()
+{
+    init_buffer();
+    mon_fichier = fopen("ex0.xml", "r");
+    if (mon_fichier == NULL)
+    {
         perror("Fichier introuvable !\n");
         exit(-1);
     }
     mon_caractere = fgetc(mon_fichier);
-    passer_espace();    
+    passer_espace();
 }
 
-void lire(char caractere){
-    if(mon_caractere == caractere){
+void lire(char caractere)
+{
+    if (mon_caractere == caractere)
+    {
         printf("%c", mon_caractere);
         mon_caractere = fgetc(mon_fichier);
-    }else{
+    }
+    else
+    {
         printf("erreur de syntaxe : caractere attendu : %c / caractere trouve %c\n", caractere, mon_caractere);
         exit(-2);
     }
 }
-
+/*
 void texte_enrichi(){
     document();
     annexes();
@@ -77,12 +96,6 @@ void section(){
 void debut_section();
 
 void fin_section();
-
-void titre(){
-    debut_titre();
-    texte();
-    fin_titre();
-}
 
 void debut_titre();
 
@@ -131,35 +144,272 @@ void texte_liste(){
     liste_texte();
     //Ou
     epsilon();
+}*/
+
+int est_mot_simple()
+{
+    return mon_caractere != ' ' && mon_caractere != '\t' && mon_caractere != '<' && mon_caractere != '\n' && mon_caractere != EOF;
 }
 
-void texte(){
-    //Doit se répéter
-    mot_enrichi();
+int est_tag(char* tag)
+{
+    int i = 0;
+    if (buffer[0] != '\0')
+    {
+        char old_buffer[SIZE_BUFFER];
+        for (int k = 0; k < SIZE_BUFFER; k++)
+        {
+            old_buffer[k] = '\0';
+        }
+        while (buffer[i] == tag[i] && i < SIZE_BUFFER)
+        {
+            old_buffer[i] = buffer[i];
+            i++;
+        }
+        i--;
+        init_buffer();
+        if (i < 0)
+        {
+            i = 0;
+        }
+        for (int j = 0; j < i; j++)
+        {
+            buffer[j] = old_buffer[j];
+        }
+    }
+
+    while (1)
+    {
+        buffer[i] = mon_caractere;
+        if (buffer[i] != tag[i])
+        {
+            return 0;
+        }
+        else if (strcmp(tag, buffer) == 0)
+        {
+            mon_caractere = fgetc(mon_fichier);
+            return 1;
+        }
+        mon_caractere = fgetc(mon_fichier);
+        i++;
+    }
 }
 
-void mot_enrichi(){
-    mot_simple();
-    //Ou
-    mot_important();
-    //Ou
-    retour_a_la_ligne();
+void fin_tag(char* tag)
+{
+    init_buffer();
+    int i = 0;
+    buffer[i] = mon_caractere;
+    while (buffer[i] == tag[i] && tag[i] != '\0')
+    {
+        i++;
+        mon_caractere = fgetc(mon_fichier);
+        if (mon_caractere == tag[i] && tag[i] != '\0')
+        {
+            buffer[i] = mon_caractere;
+        }
+    }
+    if (strcmp(buffer, tag) != 0)
+    {
+        fprintf(stderr, "Balise incorrecte\n");
+        exit(0);
+    }
 }
 
-void retour_a_la_ligne();
+void mot_simple()
+{
+    init_buffer();
+    int i = 0;
+    while (est_mot_simple())
+    {
+        buffer[i] = mon_caractere;
 
-void mot_important(){
-    debut_important();
-    //Doit se répéter
-    mot_simple();
-
-    fin_important();
+        i++;
+        mon_caractere = fgetc(mon_fichier);
+    }
+    char *mot = (char *)malloc(sizeof(char) * SIZE_BUFFER);
+    strncpy(mot, buffer, SIZE_BUFFER);
+    mon_element = nv_element(mot, "mot_simple");
+}
+/*
+int est_important()
+{
+    init_buffer();
+    char *important = "<important>";
+    int i = 0;
+    while (1)
+    {
+        buffer[i] = mon_caractere;
+        if (buffer[i] != important[i])
+        {
+            return 0;
+        }
+        else if (strcmp(important, buffer) == 0)
+        {
+            mon_caractere = fgetc(mon_fichier);
+            return 1;
+        }
+        mon_caractere = fgetc(mon_fichier);
+        i++;
+    }
 }
 
-void debut_important();
+void fin_important()
+{
+    init_buffer();
+    char *important = "</important>";
+    int i = 0;
+    buffer[i] = mon_caractere;
+    while (buffer[i] == important[i] && important[i] != '\0')
+    {
+        i++;
+        mon_caractere = fgetc(mon_fichier);
+        if (mon_caractere == important[i] && important[i] != '\0')
+        {
+            buffer[i] = mon_caractere;
+        }
+    }
+    if (strcmp(buffer, important) != 0)
+    {
+        fprintf(stderr, "Balise important incorrecte");
+    }
+}*/
 
-void fin_important();
+void mot_important()
+{
+    a_element mot_important = nv_element(NULL, "mot_important");
+    passer_espace();
+    while (mon_caractere != '<')
+    {
+        mot_simple();
+        ajouter_enfant(mot_important, mon_element);
+        passer_espace();
+    }
+    fin_tag("</important>");
+    mon_element = mot_important;
+}
+/*
+int est_br()
+{
+    int i = 0;
+    char *br = "</br>";
+    if (buffer[0] != '\0')
+    {
+        char old_buffer[SIZE_BUFFER];
+        for (int k = 0; k < SIZE_BUFFER; k++)
+        {
+            old_buffer[k] = '\0';
+        }
+        while (buffer[i] == br[i] && i < SIZE_BUFFER)
+        {
+            old_buffer[i] = buffer[i];
+            i++;
+        }
+        i--;
+        init_buffer();
+        if (i < 0)
+        {
+            i = 0;
+        }
+        for (int j = 0; j < i; j++)
+        {
+            buffer[j] = old_buffer[j];
+        }
+    }
 
-void mot_simple();
+    while (1)
+    {
+        buffer[i] = mon_caractere;
+        if (buffer[i] != br[i])
+        {
+            return 0;
+        }
+        else if (strcmp(br, buffer) == 0)
+        {
+            mon_caractere = fgetc(mon_fichier);
+            return 1;
+        }
+        mon_caractere = fgetc(mon_fichier);
+        i++;
+    }
+}*/
 
-void lire_mot_simple();
+void mot_enrichi()
+{
+    if (est_tag("<important>"))
+    {
+        mot_important();
+    }
+    else if (est_tag("</br>"))
+    {
+        a_element br = nv_element(NULL, "br");
+        mon_element = br;
+    }
+    else if (est_mot_simple())
+    {
+        mot_simple();
+    }
+    else
+    {
+        fprintf(stderr, "N'est pas un mot enrichi");
+    }
+    a_element mot_enrichi = nv_element(NULL, "mot_enrichi");
+    ajouter_enfant(mot_enrichi, mon_element);
+    mon_element = mot_enrichi;
+}
+
+void texte()
+{
+    a_element texte = nv_element(NULL, "texte");
+    //Quelle condition d'arrêt mettre ???
+    while (est_mot_simple() || mon_caractere == '<')
+    {
+        mot_enrichi();
+        ajouter_enfant(texte, mon_element);
+        passer_espace();
+    }
+    mon_element = texte;
+}
+
+void titre(){
+    a_element titre = nv_element(NULL, "titre");
+    texte();
+    ajouter_enfant(titre, mon_element);
+    mon_element = titre;
+    fin_tag("</titre>");
+}
+
+int main()
+{
+    amorcer();
+    texte();/*
+    a_element tmp = mon_element;
+    passer_espace();
+    printf("\n%i\n", est_tag("<titre>"));
+    titre();
+    ajouter_petit_frere(tmp, mon_element);
+    mon_element = tmp;*/
+    afficher_element(mon_element, 0);
+
+    /*while (mon_element != NULL)
+    {
+        printf("%s\n", mon_element->type);
+        a_element e = mon_element->aine;
+        while (e != NULL)
+        {
+            printf("\t%s\n", e->type);
+            a_element e2 = e->aine;
+            while (e2 != NULL)
+            {
+                printf("\t\t%s\n", e2->type);
+
+                e2 = e2->petit_frere;
+            }
+
+            e = e->petit_frere;
+        }
+
+        mon_element = mon_element->petit_frere;
+    }*/
+    return 1;
+}
